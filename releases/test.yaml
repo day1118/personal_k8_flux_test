@@ -1,0 +1,15 @@
+apiVersion: flux.weave.works/v1beta1
+kind: HelmRelease
+metadata:
+  name: test
+  namespace: test
+  annotations:
+    flux.weave.works/automated: "false"
+    flux.weave.works/ignore: "false"
+spec:
+  releaseName: test
+  chart:
+    git: git@github.com:day1118/personal_k8_flux_test
+    path: charts/test
+    ref: master
+  values: {}
