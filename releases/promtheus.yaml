@@ -1,0 +1,222 @@
+apiVersion: flux.weave.works/v1beta1
+kind: HelmRelease
+metadata:
+  name: prometheus
+  namespace: monitoring
+  annotations:
+    flux.weave.works/automated: "false"
+    flux.weave.works/ignore: "false"
+spec:
+  releaseName: prometheus
+  chart:
+    repository: https://kubernetes-charts.storage.googleapis.com
+    name: prometheus-operator
+    version: 5.5.1
+  values:
+    ###
+    global:
+      rbacEnable: true
+
+    ###
+    prometheus:
+      ingress:
+        enabled: true
+        hosts:
+          - prometheus.cluster.local
+
+      prometheusSpec:
+        serviceMonitorSelector: {"prometheus": "kube-prometheus"}
+        serviceMonitorNamespaceSelector:
+          any: true
+        ruleSelector: {"prometheus": "kube-prometheus"}
+        ruleNamespaceSelector:
+          any: true
+
+        resources:
+          requests:
+            cpu: 800m
+            memory: 900M
+          limits:
+            cpu: 800m
+            memory: 1.5G
+
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: rook-ceph-block
+              accessModes: ["ReadWriteMany"]
+              resources:
+                requests:
+                  storage: 20Gi
+
+        additionalScrapeConfigs:
+          - job_name: 'blackbox-icmp'
+            metrics_path: /probe
+            params:
+              module: [icmp]
+            static_configs:
+              - targets:
+                - 8.8.4.4
+                - 8.8.8.8
+                - 192.168.2.3
+                - 192.168.2.6
+                - 192.168.2.7
+                - 192.168.100.1
+                - 192.168.2.149
+                - 192.168.2.34
+                - 192.168.2.60
+                - 192.168.2.61
+                - 192.168.2.62
+                - 192.168.2.70
+                - 192.168.2.71
+                - 192.168.2.72
+                - internode.on.net
+                - ns1.telstra.net
+            relabel_configs:
+              - source_labels: [__address__]
+                target_label: __param_target
+              - source_labels: [__param_target]
+                target_label: instance
+              - target_label: __address__
+                replacement: blackbox-exporter:9115  # The blackbox exporter's real hostname:port
+
+        containers:
+          - name: ubuntu
+            image: "ubuntu:16.04"
+            command: 
+              - 'sh'
+              - '-c'
+              - 'while true; do df -h; sleep 30; done'
+              # - 'while true; do df -h /prometheus; sleep 30; done'
+            volumeMounts:
+                # Need to understand how this name is generated and find a more robust solution
+              - name: prometheus-prometheus-prometheus-oper-prometheus-db
+                mountPath: /prometheus
+
+    ###
+    alertmanager:
+      ingress:
+        enabled: true
+        hosts:
+          - alertmanager.cluster.local
+
+      config:
+        global:
+          resolve_timeout: 5m
+        route:
+          group_by:
+          - job
+          # routes:
+          # - receiver: 'aws-lambda'
+          #   match:
+          #     alertname: DeadMansSwitch
+          #   group_interval: 1s
+          #   group_wait: 1s
+          #   repeat_interval: 1m
+          group_interval: 5m
+          group_wait: 30s
+          repeat_interval: 12h
+          receiver: 'null'
+          # receiver: 'slack'
+        receivers:
+        - name: 'null'
+
+      alertmanagerSpec:
+        resources:
+          requests:
+            cpu: 200m
+            memory: 50M
+          limits:
+            cpu: 200m
+            memory: 100M
+
+    ###
+    grafana:
+      ingress:
+        enabled: true
+        hosts:
+          - grafana.cluster.local
+      sidecar:
+        dashboards:
+          enabled: true
+          label: "grafana_dashboard"
+          searchNamespace: "ALL"
+        resources:
+          requests:
+            cpu: 50m
+            memory: 50M
+          limits:
+            cpu: 50m
+            memory: 100M
+
+      plugins:
+        - jdbranham-diagram-panel
+        - grafana-piechart-panel
+
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64M
+        limits:
+          cpu: 100m
+          memory: 128M
+
+    ###
+    kubeControllerManager:
+      service:
+        selector: {"component" : "kube-controller-manager", "k8s-app": null}
+
+    ###
+    kubeScheduler:
+      service:
+        selector: {"component": "kube-scheduler", "k8s-app": null} # "tier": "control-plane"
+
+    ###
+    kubeEtcd:
+      service:
+        selector: {"component": "etcd", "k8s-app": null}
+    # exporter-kube-etcd:
+    #   serviceSelectorLabelKey: component
+    #   serviceSelectorLabelValue: etcd
+      # etcdPort:  2379
+      # scheme: https
+
+    ###
+    coreDns:
+      enabled: false
+
+    ###
+    kubeDns:
+      enabled: true
+      service:
+        selector: {"k8s-app" : "kube-dns"}
+
+    ###
+    prometheusOperator:
+      resources:
+        requests:
+          cpu: 200m
+          memory: 50M
+        limits:
+          cpu: 200m
+          memory: 100M
+
+    ###
+    kube-state-metrics:
+      resources:
+        requests:
+          cpu: 200m
+          memory: 50M
+        limits:
+          cpu: 200m
+          memory: 100M
+
+    ###
+    prometheus-node-exporter:
+      resources:
+        requests:
+          cpu: 1.00
+          memory: 100M
+        limits:
+          cpu: 1.25
+          memory: 100M
