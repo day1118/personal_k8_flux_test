@@ -80,18 +80,18 @@ spec:
               - target_label: __address__
                 replacement: blackbox-exporter:9115  # The blackbox exporter's real hostname:port
 
-        containers:
-          - name: ubuntu
-            image: "ubuntu:16.04"
-            command: 
-              - 'sh'
-              - '-c'
-              - 'while true; do df -h; sleep 30; done'
-              # - 'while true; do df -h /prometheus; sleep 30; done'
-            volumeMounts:
-                # Need to understand how this name is generated and find a more robust solution
-              - name: prometheus-prometheus-prometheus-oper-prometheus-db
-                mountPath: /prometheus
+        # containers:
+        #   - name: ubuntu
+        #     image: "ubuntu:16.04"
+        #     command: 
+        #       - 'sh'
+        #       - '-c'
+        #       - 'while true; do df -h; sleep 30; done'
+        #       # - 'while true; do df -h /prometheus; sleep 30; done'
+        #     volumeMounts:
+        #         # Need to understand how this name is generated and find a more robust solution
+        #       - name: prometheus-prometheus-prometheus-oper-prometheus-db
+        #         mountPath: /prometheus
 
     ###
     alertmanager:
